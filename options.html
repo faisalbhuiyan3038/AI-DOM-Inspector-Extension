@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      margin: 0 0 30px 0;
+      color: #333;
+      font-size: 24px;
+    }
+    .section {
+      margin-bottom: 30px;
+    }
+    label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: #555;
+    }
+    .description {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+    select, input[type="number"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .save-btn {
+      background: #4285f4;
+      color: white;
+      flex: 1;
+    }
+    .save-btn:hover {
+      background: #357ae8;
+    }
+    .reset-btn {
+      background: #f1f3f4;
+      color: #5f6368;
+    }
+    .reset-btn:hover {
+      background: #e8eaed;
+    }
+    .status {
+      padding: 12px;
+      margin-top: 20px;
+      border-radius: 4px;
+      font-size: 14px;
+      text-align: center;
+      display: none;
+    }
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+    }
+    .radio-group {
+      display: flex;
+      gap: 20px;
+      margin-top: 10px;
+    }
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .radio-option input[type="radio"] {
+      width: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚙️ Element Copier Settings</h1>
+    
+    <div class="section">
+      <label>Selection Mode</label>
+      <div class="description">Choose how you want to select elements</div>
+      <div class="radio-group">
+        <div class="radio-option">
+          <input type="radio" id="modeElement" name="selectionMode" value="element" checked>
+          <label for="modeElement" style="margin: 0;">Single Element</label>
+        </div>
+        <div class="radio-option">
+          <input type="radio" id="modeArea" name="selectionMode" value="area">
+          <label for="modeArea" style="margin: 0;">Area Selection</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <label for="ancestorLevels">Ancestor Levels to Include</label>
+      <div class="description">Number of parent elements to include (0 = selected element only, 50+ = up to body)</div>
+      <input type="number" id="ancestorLevels" min="0" max="100" value="50">
+    </div>
+
+    <div class="section">
+      <label for="includeChildren">Children Depth</label>
+      <div class="description">How many levels of child elements to include (0 = none, -1 = all)</div>
+      <input type="number" id="includeChildren" min="-1" max="20" value="-1">
+    </div>
+
+    <div class="section">
+      <label for="customPrompt">Custom Prompt Template</label>
+      <div class="description">This text will be prepended to the copied content. Use variables: {url}, {timestamp}, {dom}, {css}</div>
+      <textarea id="customPrompt" placeholder="Enter your custom prompt here...">element copied by another tool that does the same job:
+
+DOM structure:
+{dom}
+
+CSS rules:
+{css}</textarea>
+    </div>
+
+    <div class="button-group">
+      <button id="saveBtn" class="save-btn">💾 Save Settings</button>
+      <button id="resetBtn" class="reset-btn">🔄 Reset to Defaults</button>
+    </div>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
