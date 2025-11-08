@@ -2,6 +2,12 @@ let isSelecting = false;
 let overlay = null;
 let tooltip = null;
 let settings = {};
+let areaSelection = {
+  isDrawing: false,
+  startX: 0,
+  startY: 0,
+  selectionBox: null
+};
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -10,7 +16,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       selectionMode: 'element',
       ancestorLevels: 50,
       includeChildren: -1,
-      customPrompt: 'element copied by another tool that does the same job:\n\nDOM structure:\n{dom}\n\nCSS rules:\n{css}'
+      customPrompt: "I'm using DevTools in browser. I'm using the Elements tool to inspect an element. I will give you, below, the DOM structure where the element I am currenlty inspecting is located. I will provide the element itself and its ancestors, just like they appear in the DOM. I'll omit the rest of the DOM to keep it short. I will also give the list of CSS rules that apply to the elements that I'm providing in the DOM stucture. I want to ask you questions about this to fix the HTML/CSS issues that I'm facing. Please act as a friendly CSS expert who is willing to help me debug my issues. Whenever possible, provide fixes for the issues that I'm facing. If I'm asking questions about an element different than the one that's selected and you can't answer, please tell me. When I say 'this element', 'the element' or 'current element', I mean the deepest element in the DOM tree.\n\nDOM structure:\n{dom}\n\nCSS rules:\n{css}"
     }, (loadedSettings) => {
       settings = loadedSettings;
       startSelection();
@@ -26,7 +32,7 @@ function startSelection() {
   isSelecting = true;
   document.body.classList.add('element-copier-cursor');
 
-  // Create overlay
+  // Create overlay for element mode
   overlay = document.createElement('div');
   overlay.className = 'element-copier-overlay';
   document.body.appendChild(overlay);
@@ -34,15 +40,24 @@ function startSelection() {
   // Create tooltip
   tooltip = document.createElement('div');
   tooltip.className = 'element-copier-tooltip';
+  tooltip.textContent = settings.selectionMode === 'area' ? 'Click and drag to select area' : 'Click to select element';
   document.body.appendChild(tooltip);
 
-  document.addEventListener('mousemove', handleMouseMove);
-  document.addEventListener('click', handleClick);
+  if (settings.selectionMode === 'area') {
+    document.addEventListener('mousedown', handleAreaMouseDown);
+    document.addEventListener('mousemove', handleAreaMouseMove);
+    document.addEventListener('mouseup', handleAreaMouseUp);
+  } else {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('click', handleClick);
+  }
+
   document.addEventListener('keydown', handleKeyDown);
 }
 
+// Element selection handlers
 function handleMouseMove(e) {
-  if (!isSelecting) return;
+  if (!isSelecting || settings.selectionMode === 'area') return;
 
   const target = e.target;
   if (target === overlay || target === tooltip) return;
@@ -60,7 +75,7 @@ function handleMouseMove(e) {
 }
 
 function handleClick(e) {
-  if (!isSelecting) return;
+  if (!isSelecting || settings.selectionMode === 'area') return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -70,6 +85,189 @@ function handleClick(e) {
 
   copyElementData(target);
   stopSelection();
+}
+
+// Area selection handlers
+function handleAreaMouseDown(e) {
+  if (!isSelecting || settings.selectionMode !== 'area') return;
+
+  e.preventDefault();
+
+  areaSelection.isDrawing = true;
+  areaSelection.startX = e.pageX;
+  areaSelection.startY = e.pageY;
+
+  // Create selection box
+  if (!areaSelection.selectionBox) {
+    areaSelection.selectionBox = document.createElement('div');
+    areaSelection.selectionBox.className = 'element-copier-area-box';
+    document.body.appendChild(areaSelection.selectionBox);
+  }
+
+  areaSelection.selectionBox.style.left = areaSelection.startX + 'px';
+  areaSelection.selectionBox.style.top = areaSelection.startY + 'px';
+  areaSelection.selectionBox.style.width = '0px';
+  areaSelection.selectionBox.style.height = '0px';
+  areaSelection.selectionBox.style.display = 'block';
+
+  // Hide element overlay and tooltip while drawing
+  overlay.style.display = 'none';
+  tooltip.style.display = 'none';
+}
+
+function handleAreaMouseMove(e) {
+  if (!isSelecting || settings.selectionMode !== 'area') return;
+
+  if (areaSelection.isDrawing) {
+    e.preventDefault();
+
+    const currentX = e.pageX;
+    const currentY = e.pageY;
+
+    const width = Math.abs(currentX - areaSelection.startX);
+    const height = Math.abs(currentY - areaSelection.startY);
+    const left = Math.min(currentX, areaSelection.startX);
+    const top = Math.min(currentY, areaSelection.startY);
+
+    areaSelection.selectionBox.style.left = left + 'px';
+    areaSelection.selectionBox.style.top = top + 'px';
+    areaSelection.selectionBox.style.width = width + 'px';
+    areaSelection.selectionBox.style.height = height + 'px';
+
+    tooltip.textContent = `Area: ${Math.round(width)}x${Math.round(height)}px`;
+    tooltip.style.left = e.pageX + 15 + 'px';
+    tooltip.style.top = e.pageY + 15 + 'px';
+    tooltip.style.display = 'block';
+  } else {
+    // Show preview on hover
+    tooltip.textContent = 'Click and drag to select area';
+    tooltip.style.left = e.pageX + 15 + 'px';
+    tooltip.style.top = e.pageY + 15 + 'px';
+    tooltip.style.display = 'block';
+  }
+}
+
+function handleAreaMouseUp(e) {
+  if (!isSelecting || settings.selectionMode !== 'area' || !areaSelection.isDrawing) return;
+
+  e.preventDefault();
+
+  areaSelection.isDrawing = false;
+
+  // Get the bounding box
+  const box = areaSelection.selectionBox.getBoundingClientRect();
+
+  // Find all elements within this area
+  const elementsInArea = getElementsInArea(box);
+
+  if (elementsInArea.length > 0) {
+    copyAreaData(elementsInArea, box);
+  } else {
+    showNotification('No elements found in selected area', 'error');
+  }
+
+  stopSelection();
+}
+
+function getElementsInArea(box) {
+  const allElements = document.querySelectorAll('body *');
+  const elementsInArea = [];
+
+  for (let element of allElements) {
+    // Skip our own extension elements
+    if (element.classList.contains('element-copier-overlay') ||
+      element.classList.contains('element-copier-tooltip') ||
+      element.classList.contains('element-copier-area-box') ||
+      element.classList.contains('element-copier-notification')) {
+      continue;
+    }
+
+    const rect = element.getBoundingClientRect();
+
+    // Check if element is within the selection box
+    if (rect.left >= box.left &&
+      rect.right <= box.right &&
+      rect.top >= box.top &&
+      rect.bottom <= box.bottom) {
+      elementsInArea.push(element);
+    }
+  }
+
+  return elementsInArea;
+}
+
+function copyAreaData(elements, box) {
+  // Find the common ancestor of all selected elements
+  const commonAncestor = findCommonAncestor(elements);
+
+  if (!commonAncestor) {
+    showNotification('Could not find common ancestor', 'error');
+    return;
+  }
+
+  // Get ancestors of the common ancestor
+  const ancestors = settings.ancestorLevels > 0
+    ? getAncestors(commonAncestor, settings.ancestorLevels + 1)
+    : [commonAncestor];
+
+  // Build DOM structure
+  let domHTML = '`html\n';
+  domHTML += buildNestedHTML(ancestors, commonAncestor, -1);
+  domHTML += '\n`';
+
+  // Build CSS for all elements in the area
+  let cssText = '`css\n';
+  const allElementsToStyle = [...ancestors, ...elements];
+  const uniqueElements = [...new Set(allElementsToStyle)];
+
+  uniqueElements.forEach(element => {
+    const rules = getAllAppliedStyles(element);
+
+    cssText += `/** For the <${element.tagName.toLowerCase()}${getAttributesString(element)}> element **/\n`;
+
+    if (Object.keys(rules).length > 0) {
+      cssText += formatCSS(rules) + '\n';
+    } else {
+      cssText += `/* No stylesheet rules found for this element */\n\n`;
+    }
+  });
+  cssText += '`';
+
+  // Format final output
+  let output = settings.customPrompt
+    .replace('{dom}', domHTML)
+    .replace('{css}', cssText)
+    .replace('{url}', window.location.href)
+    .replace('{timestamp}', new Date().toISOString());
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(output).then(() => {
+    showNotification(`✓ Copied ${elements.length} elements to clipboard!`, 'success');
+  }).catch(err => {
+    console.error('Failed to copy:', err);
+    showNotification('✗ Failed to copy', 'error');
+  });
+}
+
+function findCommonAncestor(elements) {
+  if (elements.length === 0) return null;
+  if (elements.length === 1) return elements[0];
+
+  // Get all ancestors for the first element
+  let commonAncestor = elements[0];
+
+  while (commonAncestor) {
+    // Check if this ancestor contains all elements
+    const containsAll = elements.every(el => commonAncestor.contains(el));
+
+    if (containsAll) {
+      return commonAncestor;
+    }
+
+    commonAncestor = commonAncestor.parentElement;
+  }
+
+  return document.body;
 }
 
 function handleKeyDown(e) {
@@ -93,8 +291,18 @@ function stopSelection() {
     tooltip = null;
   }
 
+  if (areaSelection.selectionBox) {
+    areaSelection.selectionBox.remove();
+    areaSelection.selectionBox = null;
+  }
+
+  areaSelection.isDrawing = false;
+
   document.removeEventListener('mousemove', handleMouseMove);
   document.removeEventListener('click', handleClick);
+  document.removeEventListener('mousedown', handleAreaMouseDown);
+  document.removeEventListener('mousemove', handleAreaMouseMove);
+  document.removeEventListener('mouseup', handleAreaMouseUp);
   document.removeEventListener('keydown', handleKeyDown);
 }
 
