@@ -1,17 +1,21 @@
 document.getElementById('selectElement').addEventListener('click', async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-  chrome.tabs.sendMessage(tab.id, { action: 'startSelection' }, (response) => {
-    if (chrome.runtime.lastError) {
-      showStatus('Please refresh the page and try again', 'error');
-      return;
-    }
+  try {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    
+    // Send the message and await a response (or for it to complete)
+    await browser.tabs.sendMessage(tab.id, { action: 'startSelection' });
+    
+    // Close the popup window
     window.close();
-  });
+  } catch (error) {
+    // This 'catch' block replaces the 'chrome.runtime.lastError' check
+    console.error("Error starting selection:", error.message);
+    showStatus('Please refresh the page and try again', 'error');
+  }
 });
 
 document.getElementById('openOptions').addEventListener('click', () => {
-  chrome.runtime.openOptionsPage();
+  browser.runtime.openOptionsPage();
 });
 
 function showStatus(message, type) {

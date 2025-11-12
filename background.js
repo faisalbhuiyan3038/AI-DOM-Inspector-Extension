@@ -1,6 +1,6 @@
 // Initialize default settings on install
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.set({
+browser.runtime.onInstalled.addListener(() => {
+  browser.storage.sync.set({
     selectionMode: 'element',
     ancestorLevels: 50,
     includeChildren: -1,
@@ -14,14 +14,6 @@ CSS rules:
   });
 });
 
-// Handle extension icon click
-chrome.action.onClicked.addListener((tab) => {
-  chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    function: startSelection
-  });
-});
-
-function startSelection() {
-  chrome.runtime.sendMessage({ action: 'startSelection' });
-}
+// Note: The chrome.action.onClicked listener was removed.
+// It was redundant because you have a 'default_popup' specified in the manifest.
+// The logic is correctly handled by popup.js.

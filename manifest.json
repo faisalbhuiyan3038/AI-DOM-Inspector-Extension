@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AI DOM Inspector",
+  "name": "Copy DOM and CSS for AI Context",
   "version": "1.0.0",
   "description": "Select elements or areas and copy their DOM structure and CSS to ask AI models for help.",
   "permissions": [
@@ -30,6 +30,7 @@
         "<all_urls>"
       ],
       "js": [
+        "browser-polyfill.min.js",
         "content.js"
       ],
       "css": [
@@ -38,6 +39,14 @@
     }
   ],
   "background": {
-    "service_worker": "background.js"
+    "scripts": [
+      "browser-polyfill.min.js",
+      "background.js"
+    ]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ai-dom-inspector@faisalbhuiyan.com"
+    }
   }
 }

@@ -10,20 +10,28 @@ let areaSelection = {
 };
 
 // Listen for messages from popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+browser.runtime.onMessage.addListener(async (request, sender) => {
   if (request.action === 'startSelection') {
-    chrome.storage.sync.get({
-      selectionMode: 'element',
-      ancestorLevels: 50,
-      includeChildren: -1,
-      customPrompt: "I'm using DevTools in browser. I'm using the Elements tool to inspect an element. I will give you, below, the DOM structure where the element I am currenlty inspecting is located. I will provide the element itself and its ancestors, just like they appear in the DOM. I'll omit the rest of the DOM to keep it short. I will also give the list of CSS rules that apply to the elements that I'm providing in the DOM stucture. I want to ask you questions about this to fix the HTML/CSS issues that I'm facing. Please act as a friendly CSS expert who is willing to help me debug my issues. Whenever possible, provide fixes for the issues that I'm facing. If I'm asking questions about an element different than the one that's selected and you can't answer, please tell me. When I say 'this element', 'the element' or 'current element', I mean the deepest element in the DOM tree.\n\nDOM structure:\n{dom}\n\nCSS rules:\n{css}"
-    }, (loadedSettings) => {
-      settings = loadedSettings;
+    try {
+      // Load settings using the promise-based API
+      settings = await browser.storage.sync.get({
+        selectionMode: 'element',
+        ancestorLevels: 50,
+        includeChildren: -1,
+        customPrompt: "I'm using DevTools in browser. I'm using the Elements tool to inspect an element. I will give you, below, the DOM structure where the element I am currenlty inspecting is located. I will provide the element itself and its ancestors, just like they appear in the DOM. I'll omit the rest of the DOM to keep it short. I will also give the list of CSS rules that apply to the elements that I'm providing in the DOM stucture. I want to ask you questions about this to fix the HTML/CSS issues that I'm facing. Please act as a friendly CSS expert who is willing to help me debug my issues. Whenever possible, provide fixes for the issues that I'm facing. If I'm asking questions about an element different than the one that's selected and you can't answer, please tell me. When I say 'this element', 'the element' or 'current element', I mean the deepest element in the DOM tree.\n\nDOM structure:\n{dom}\n\nCSS rules:\n{css}"
+      });
+      
       startSelection();
-      sendResponse({ success: true });
-    });
-    return true;
+      
+      // Return a value to fulfill the promise popup.js is awaiting
+      return { success: true };
+    } catch (e) {
+      console.error("Error loading settings in content script:", e);
+      return { success: false, error: e.message };
+    }
   }
+  // Indicate that the message listener is not asynchronous for other messages
+  return false;
 });
 
 function startSelection() {
